@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Adri Learning Games</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Comic+Neue:wght@700&display=swap');
+
+    body {
+      margin: 0;
+      font-family: 'Comic Neue', cursive;
+      background: #fff url('optimized-bg.jpg') no-repeat center center / cover;
+      overflow: hidden;
+    }
+
+    .start-screen {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      background: rgba(255, 255, 255, 0.85);
+      z-index: 2;
+      text-align: center;
+    }
+
+    .start-screen h1 {
+      font-size: 4rem;
+      color: #ff4081;
+      text-shadow: 2px 2px #ffccbc;
+      margin-bottom: 1rem;
+    }
+
+    .start-screen .game-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .start-screen button, .start-screen select {
+      background-color: #28a745;
+      border: none;
+      color: white;
+      margin: 0.5rem;
+      padding: 0.8rem 1.5rem;
+      border-radius: 8px;
+      font-size: 1.3rem;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    .start-screen button:hover, .start-screen select:hover {
+      background-color: #218838;
+    }
+
+    .exit-button {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #dc3545;
+      color: #fff;
+      font-size: 1.2rem;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      z-index: 999;
+    }
+
+    .game-screen {
+      position: absolute;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .balloon {
+      position: absolute;
+      font-size: 16rem;
+      font-weight: 900;
+      width: 250px;
+      height: 270px;
+      border-radius: 50% 50% 45% 45%;
+      background: yellow;
+      color: red;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      cursor: pointer;
+    }
+
+    .rope {
+      width: 2px;
+      height: 50px;
+      background: #333;
+      margin-top: -5px;
+    }
+
+    .pop {
+      animation: pop 0.5s ease-out forwards;
+    }
+
+    @keyframes pop {
+      0% {
+        transform: scale(1);
+        opacity: 1;
+      }
+      100% {
+        transform: scale(2);
+        opacity: 0;
+      }
+    }
+
+    .finish {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(to bottom right, #fff176, #ffeb3b);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      z-index: 3;
+      animation: fadeIn 1s ease-in;
+      text-align: center;
+    }
+
+    .finish h1 {
+      font-size: 5rem;
+      color: #d32f2f;
+      animation: pop 1s ease-in-out;
+      text-shadow: 2px 2px #fff;
+      margin: 0;
+    }
+
+    .finish button {
+      font-size: 1.5rem;
+      margin-top: 1rem;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <audio id="bg-music" src="https://cdn.pixabay.com/download/audio/2022/03/08/audio_1f9a3092f4.mp3?filename=gentle-marimba-11292.mp3" loop></audio>
+  <audio id="correct-sound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_1741e1f8fa.mp3?filename=tink-26763.mp3"></audio>
+  <audio id="wrong-sound" src="https://cdn.pixabay.com/download/audio/2021/10/30/audio_f3cf247845.mp3?filename=error-126627.mp3"></audio>
+  <audio id="clap-sound" src="https://cdn.pixabay.com/download/audio/2022/03/17/audio_0bfa2dcb62.mp3?filename=kids-cheering-6163.mp3"></audio>
+
+  <div class="start-screen" id="start-screen">
+    <h1>Adri Learning Games</h1>
+    <label>Speed:
+      <select id="speed">
+        <option value="1">Slow</option>
+        <option value="2" selected>Medium</option>
+        <option value="3">Fast</option>
+      </select>
+    </label>
+    <div class="game-buttons">
+      <button onclick="startGame('lower')">a to z</button>
+      <button onclick="startGame('upper')">A to Z</button>
+      <button onclick="startGame('num10')">1 to 10</button>
+      <button onclick="startGame('num20')">1 to 20</button>
+    </div>
+  </div>
+
+  <div class="game-screen" id="game-screen"></div>
+  <div class="finish" id="finish-screen" style="display:none;">
+    <h1>🎉 Well Done! 🎉</h1>
+    <button onclick="location.reload()">Play Again</button>
+  </div>
+
+  <script>
+    let selectedVoice = null;
+
+    function loadVoices() {
+      return new Promise(resolve => {
+        let voices = speechSynthesis.getVoices();
+        if (voices.length) {
+          resolve(voices);
+        } else {
+          speechSynthesis.onvoiceschanged = () => {
+            voices = speechSynthesis.getVoices();
+            resolve(voices);
+          };
+        }
+      });
+    }
+
+    async function speakLetter(letter) {
+      if (!selectedVoice) {
+        const voices = await loadVoices();
+        selectedVoice = voices.find(v =>
+          v.name.toLowerCase().includes('female') ||
+          v.name.toLowerCase().includes('samantha') ||
+          v.name.toLowerCase().includes('google us english') ||
+          v.name.toLowerCase().includes('karen')
+        ) || voices[0];
+      }
+
+      const utterance = new SpeechSynthesisUtterance(letter);
+      utterance.voice = selectedVoice;
+      utterance.lang = 'en-US';
+      utterance.rate = 0.8;
+      speechSynthesis.cancel();
+      setTimeout(() => speechSynthesis.speak(utterance), 50);
+    }
+
+    function startGame(mode) {
+      const startScreen = document.getElementById('start-screen');
+      const gameScreen = document.getElementById('game-screen');
+      const finishScreen = document.getElementById('finish-screen');
+      const bgMusic = document.getElementById('bg-music');
+      const clapSound = document.getElementById('clap-sound');
+      const correctSound = document.getElementById('correct-sound');
+      const wrongSound = document.getElementById('wrong-sound');
+
+      bgMusic.volume = 0.1;
+      bgMusic.play().catch(() => {});
+      startScreen.style.display = 'none';
+      gameScreen.innerHTML = '';
+
+      const exitBtn = document.createElement('button');
+      exitBtn.textContent = 'Exit';
+      exitBtn.className = 'exit-button';
+      exitBtn.onclick = () => location.reload();
+      document.body.appendChild(exitBtn);
+
+      const speed = parseInt(document.getElementById('speed').value);
+      let letters;
+      if (mode === 'lower') letters = 'abcdefghijklmnopqrstuvwxyz';
+      else if (mode === 'upper') letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      else if (mode === 'num10') letters = Array.from({ length: 10 }, (_, i) => (i + 1).toString());
+      else if (mode === 'num20') letters = Array.from({ length: 20 }, (_, i) => (i + 1).toString());
+
+      let index = 0;
+
+      function showLetter() {
+        if (index >= letters.length) {
+          finishScreen.style.display = 'flex';
+          speechSynthesis.cancel();
+          clapSound.play().catch(e => console.warn("Clap sound error:", e));
+          document.body.removeChild(exitBtn);
+          return;
+        }
+
+        const letter = letters[index];
+        const balloon = document.createElement('div');
+        balloon.className = 'balloon';
+        balloon.innerHTML = `<div>${letter}</div><div class="rope"></div>`;
+        gameScreen.appendChild(balloon);
+
+        let x = Math.random() * (window.innerWidth - 250);
+        let y = Math.random() * (window.innerHeight - 270);
+        let dx = (Math.random() * 2 + 1) * (Math.random() > 0.5 ? 1 : -1) * speed;
+        let dy = (Math.random() * 2 + 1) * (Math.random() > 0.5 ? 1 : -1) * speed;
+
+        function moveBalloon() {
+          x += dx;
+          y += dy;
+          if (x <= 0 || x >= window.innerWidth - 250) dx *= -1;
+          if (y <= 0 || y >= window.innerHeight - 270) dy *= -1;
+          balloon.style.left = `${x}px`;
+          balloon.style.top = `${y}px`;
+          requestAnimationFrame(moveBalloon);
+        }
+
+        moveBalloon();
+        speakLetter(letter);
+        const speakInterval = setInterval(() => speakLetter(letter), 5000);
+
+        function next() {
+          correctSound.play();
+          balloon.classList.add('pop');
+          document.removeEventListener('keydown', handleKey);
+          balloon.removeEventListener('click', next);
+          balloon.removeEventListener('touchstart', next);
+          clearInterval(speakInterval);
+          speechSynthesis.cancel();
+          setTimeout(() => {
+            gameScreen.removeChild(balloon);
+            index++;
+            showLetter();
+          }, 500);
+        }
+
+        function handleKey(event) {
+          if (event.key.toLowerCase() === letter.toLowerCase()) {
+            next();
+          } else {
+            wrongSound.play();
+          }
+        }
+
+        document.addEventListener('keydown', handleKey);
+        balloon.addEventListener('click', next);
+        balloon.addEventListener('touchstart', next);
+      }
+
+      showLetter();
+    }
+  </script>
+</body>
+</html>
